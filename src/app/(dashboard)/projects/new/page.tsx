@@ -201,7 +201,7 @@ export default function NewProjectPage() {
   return (
     <div>
       {/* 앨범 제목 */}
-      {currentStep === 0 && !projectId && (
+      {currentStep === 0 && (
         <div className="mb-6 bg-white rounded-lg border border-slate-200 p-5">
           <label className="text-sm font-medium text-slate-700 block mb-2">앨범 제목</label>
           <input
