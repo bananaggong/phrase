@@ -14,7 +14,7 @@ export function getRootFolderId(): string {
   return (process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID ?? "").trim();
 }
 
-function getDriveClient() {
+export function getDriveClient() {
   const auth = new google.auth.JWT({
     email: getEmail(),
     key: getPrivateKey(),
@@ -79,6 +79,26 @@ export async function uploadFile(
   return {
     fileId: res.data.id!,
     webViewLink: res.data.webViewLink ?? "",
+  };
+}
+
+// Drive 폴더에서 파일 이름으로 검색 → { fileId, webViewLink } 또는 null
+export async function findFileInFolder(
+  fileName: string,
+  folderId: string
+): Promise<{ fileId: string; webViewLink: string } | null> {
+  const drive = getDriveClient();
+  const res = await drive.files.list({
+    q: `name='${fileName}' and '${folderId}' in parents and trashed=false`,
+    fields: "files(id, webViewLink)",
+    spaces: "drive",
+    includeItemsFromAllDrives: true,
+    supportsAllDrives: true,
+  });
+  if (!res.data.files || res.data.files.length === 0) return null;
+  return {
+    fileId: res.data.files[0].id!,
+    webViewLink: res.data.files[0].webViewLink ?? `https://drive.google.com/file/d/${res.data.files[0].id}/view`,
   };
 }
 

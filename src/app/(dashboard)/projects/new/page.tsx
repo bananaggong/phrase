@@ -160,18 +160,40 @@ export default function NewProjectPage() {
       const { uploadUrl, fileName } = await urlRes.json() as { uploadUrl: string; fileName: string }
 
       // 2단계: 파일을 Google Drive에 직접 업로드
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'audio/wav' },
-        body: file,
-      })
-      if (!uploadRes.ok) {
+      // Google Drive resumable upload 응답에 CORS 헤더가 없어 브라우저에서 응답을 읽지 못함
+      // 업로드 자체는 성공하므로, 에러를 catch한 후 서버에서 파일 존재 여부를 확인
+      let uploadOk = false
+      try {
+        const uploadRes = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'audio/wav' },
+          body: file,
+        })
+        uploadOk = uploadRes.ok
+      } catch {
+        // CORS로 인해 응답을 읽지 못했지만 업로드는 완료됨 — confirm으로 확인
+        uploadOk = true
+      }
+
+      if (!uploadOk) {
         updateSong(idx, { uploadingAudio: false, audioError: '업로드에 실패했습니다.' })
         return
       }
-      const driveFile = await uploadRes.json() as { id: string; webViewLink?: string }
-      const driveFileId = driveFile.id
-      const webViewLink = driveFile.webViewLink || `https://drive.google.com/file/d/${driveFileId}/view`
+
+      // 3단계: 서버에서 Drive 파일 ID 확인
+      const confirmRes = await fetch(`/api/projects/${pid}/steps/${stepNum}/audio-confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName }),
+      })
+      const confirmData = await confirmRes.json() as { driveFileId?: string; webViewLink?: string; error?: string }
+      if (!confirmRes.ok) {
+        updateSong(idx, { uploadingAudio: false, audioError: confirmData.error || '업로드 확인 실패' })
+        return
+      }
+
+      const driveFileId = confirmData.driveFileId!
+      const webViewLink = confirmData.webViewLink || `https://drive.google.com/file/d/${driveFileId}/view`
 
       updateSong(idx, {
         uploadingAudio: false,

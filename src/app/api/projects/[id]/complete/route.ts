@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { google } from "googleapis";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
-import { getOrCreateFolder, getRootFolderId } from "@/lib/google-drive";
+import { getOrCreateFolder, getRootFolderId, getDriveClient } from "@/lib/google-drive";
 
 export const maxDuration = 60;
 
@@ -19,20 +18,6 @@ const completeSchema = z.object({
     })
   ),
 });
-
-function getDriveClient() {
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(
-        /\\n/g,
-        "\n"
-      ),
-    },
-    scopes: ["https://www.googleapis.com/auth/drive"],
-  });
-  return google.drive({ version: "v3", auth });
-}
 
 export async function POST(
   request: Request,
