@@ -20,6 +20,8 @@ export async function GET() {
     lastLine: key.split("\n").filter((l) => l.trim()).slice(-1)[0],
   };
 
+  const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID ?? "(없음)";
+
   try {
     const jwtClient = new google.auth.JWT({
       email,
@@ -28,12 +30,32 @@ export async function GET() {
     });
     const tokens = await jwtClient.authorize();
 
+    const drive = google.drive({ version: "v3", auth: jwtClient });
+
+    // 루트 폴더 접근 테스트
+    let folderTest: { ok: boolean; name?: string; error?: string } = { ok: false };
+    try {
+      const folderRes = await drive.files.get({
+        fileId: rootFolderId,
+        fields: "id, name",
+        supportsAllDrives: true,
+      });
+      folderTest = { ok: true, name: folderRes.data.name ?? "" };
+    } catch (folderErr) {
+      folderTest = {
+        ok: false,
+        error: folderErr instanceof Error ? folderErr.message : String(folderErr),
+      };
+    }
+
     return NextResponse.json({
       ok: true,
       email,
       keyInfo,
       tokenType: tokens.token_type,
       expiryDate: tokens.expiry_date,
+      rootFolderId,
+      folderTest,
     });
   } catch (err) {
     return NextResponse.json(
@@ -41,6 +63,7 @@ export async function GET() {
         ok: false,
         email,
         keyInfo,
+        rootFolderId,
         error: err instanceof Error ? err.message : String(err),
       },
       { status: 500 }
