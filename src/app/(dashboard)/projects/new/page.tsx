@@ -1,225 +1,328 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-
-const STEPS = [
-  { title: '1단계', description: '이 단계에 대한 설명이 여기에 들어갑니다.' },
-  { title: '2단계', description: '이 단계에 대한 설명이 여기에 들어갑니다.' },
-  { title: '3단계', description: '이 단계에 대한 설명이 여기에 들어갑니다.' },
-  { title: '4단계', description: '이 단계에 대한 설명이 여기에 들어갑니다.' },
-  { title: '5단계', description: '이 단계에 대한 설명이 여기에 들어갑니다.' },
-  { title: '6단계', description: '이 단계에 대한 설명이 여기에 들어갑니다.' },
-  { title: '7단계', description: '이 단계에 대한 설명이 여기에 들어갑니다.' },
-  { title: '8단계', description: '이 단계에 대한 설명이 여기에 들어갑니다.' },
-  { title: '9단계', description: '이 단계에 대한 설명이 여기에 들어갑니다.' },
-  { title: '10단계', description: '이 단계에 대한 설명이 여기에 들어갑니다.' },
-]
+import ImageUploadStep from '@/components/ImageUploadStep'
+import SongStep, { SongData } from '@/components/SongStep'
+import ConfirmModal from '@/components/ConfirmModal'
 
 interface UploadedFile {
-  step: number
   driveFileId: string
   webViewLink: string
   originalName: string
+  thumbnailBase64?: string
+}
+
+interface SongState extends SongData {
+  uploadingLyrics: boolean
+  uploadingAudio: boolean
+  lyricsError: string | null
+  audioError: string | null
+}
+
+const EMPTY_SONG: SongState = {
+  songName: '',
+  lyricsMode: 'file',
+  lyricsText: '',
+  lyricsUploaded: null,
+  audioUploaded: null,
+  uploadingLyrics: false,
+  uploadingAudio: false,
+  lyricsError: null,
+  audioError: null,
 }
 
 export default function NewProjectPage() {
   const router = useRouter()
-  const [projectName, setProjectName] = useState('')
-  const [currentStep, setCurrentStep] = useState(0) // 0-indexed (0~9)
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
-  const [uploadingStep, setUploadingStep] = useState<number | null>(null)
-  const [isCompleting, setIsCompleting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [albumTitle, setAlbumTitle] = useState('')
+  const [currentStep, setCurrentStep] = useState(0) // 0=커버, 1~N=곡
   const [projectId, setProjectId] = useState<string | null>(null)
-  const [isDragOver, setIsDragOver] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [photoFile, setPhotoFile] = useState<UploadedFile | null>(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const [songs, setSongs] = useState<SongState[]>([
+    { ...EMPTY_SONG },
+    { ...EMPTY_SONG },
+    { ...EMPTY_SONG },
+    { ...EMPTY_SONG },
+  ])
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [isCompleting, setIsCompleting] = useState(false)
 
-  const isLastStep = currentStep === STEPS.length - 1
-  const fileForCurrentStep = uploadedFiles.find(f => f.step === currentStep + 1)
+  const totalSteps = 1 + songs.length
+  const isLastStep = currentStep === totalSteps - 1
+  const canComplete = songs.every(s => s.songName.trim() !== '')
 
-  async function ensureProjectCreated(): Promise<string> {
+  async function ensureProject(): Promise<string> {
     if (projectId) return projectId
     const res = await fetch('/api/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: projectName || '새 프로젝트', description: '' }),
+      body: JSON.stringify({ name: albumTitle || '새 앨범', description: '' }),
     })
     const data = await res.json() as { projectId: string }
     setProjectId(data.projectId)
     return data.projectId
   }
 
-  async function handleFileUpload(file: File) {
-    if (!file) return
-    setUploadingStep(currentStep + 1)
-    setError(null)
+  async function handlePhotoUpload(file: File) {
+    setPhotoUploading(true)
+    setPhotoError(null)
     try {
-      const pid = await ensureProjectCreated()
+      const pid = await ensureProject()
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch(`/api/projects/${pid}/steps/${currentStep + 1}/upload`, {
+      const res = await fetch(`/api/projects/${pid}/steps/1/upload`, {
         method: 'POST',
         body: formData,
       })
-      if (!res.ok) { setError('파일 업로드에 실패했습니다.'); return }
-      const data = await res.json() as { driveFileId: string; webViewLink: string; originalName: string; step: number }
-      setUploadedFiles(prev => {
-        const filtered = prev.filter(f => f.step !== currentStep + 1)
-        return [...filtered, { step: currentStep + 1, driveFileId: data.driveFileId, webViewLink: data.webViewLink, originalName: data.originalName }]
-      })
+      const data = await res.json() as UploadedFile & { error?: string }
+      if (!res.ok) { setPhotoError(data.error || '사진 업로드에 실패했습니다.'); return }
+      setPhotoFile(data)
     } catch {
-      setError('파일 업로드 중 오류가 발생했습니다.')
+      setPhotoError('사진 업로드 중 오류가 발생했습니다.')
     } finally {
-      setUploadingStep(null)
+      setPhotoUploading(false)
     }
+  }
+
+  function updateSong(idx: number, patch: Partial<SongState>) {
+    setSongs(prev => prev.map((s, i) => i === idx ? { ...s, ...patch } : s))
+  }
+
+  async function handleLyricsFileUpload(idx: number, file: File) {
+    if (!songs[idx].songName.trim()) {
+      updateSong(idx, { lyricsError: '곡 이름을 먼저 입력해주세요.' })
+      return
+    }
+    updateSong(idx, { uploadingLyrics: true, lyricsError: null })
+    try {
+      const pid = await ensureProject()
+      const stepNum = idx + 2
+      const form = new FormData()
+      form.append('fileType', 'lyrics')
+      form.append('songName', songs[idx].songName)
+      form.append('file', file)
+      const res = await fetch(`/api/projects/${pid}/steps/${stepNum}/upload`, { method: 'POST', body: form })
+      const data = await res.json() as UploadedFile & { error?: string }
+      if (!res.ok) { updateSong(idx, { uploadingLyrics: false, lyricsError: data.error || '업로드 실패' }); return }
+      updateSong(idx, { uploadingLyrics: false, lyricsUploaded: data })
+    } catch {
+      updateSong(idx, { uploadingLyrics: false, lyricsError: '업로드 중 오류가 발생했습니다.' })
+    }
+  }
+
+  async function handleLyricsTextSave(idx: number) {
+    const song = songs[idx]
+    if (!song.songName.trim()) {
+      updateSong(idx, { lyricsError: '곡 이름을 먼저 입력해주세요.' })
+      return
+    }
+    if (!song.lyricsText.trim()) return
+    updateSong(idx, { uploadingLyrics: true, lyricsError: null })
+    try {
+      const pid = await ensureProject()
+      const stepNum = idx + 2
+      const form = new FormData()
+      form.append('fileType', 'lyrics')
+      form.append('songName', song.songName)
+      form.append('lyricsText', song.lyricsText)
+      const res = await fetch(`/api/projects/${pid}/steps/${stepNum}/upload`, { method: 'POST', body: form })
+      const data = await res.json() as UploadedFile & { error?: string }
+      if (!res.ok) { updateSong(idx, { uploadingLyrics: false, lyricsError: data.error || '저장 실패' }); return }
+      updateSong(idx, { uploadingLyrics: false, lyricsUploaded: data })
+    } catch {
+      updateSong(idx, { uploadingLyrics: false, lyricsError: '저장 중 오류가 발생했습니다.' })
+    }
+  }
+
+  async function handleAudioUpload(idx: number, file: File) {
+    if (!songs[idx].songName.trim()) {
+      updateSong(idx, { audioError: '곡 이름을 먼저 입력해주세요.' })
+      return
+    }
+    updateSong(idx, { uploadingAudio: true, audioError: null })
+    try {
+      const pid = await ensureProject()
+      const stepNum = idx + 2
+      const form = new FormData()
+      form.append('fileType', 'audio')
+      form.append('songName', songs[idx].songName)
+      form.append('file', file)
+      const res = await fetch(`/api/projects/${pid}/steps/${stepNum}/upload`, { method: 'POST', body: form })
+      const data = await res.json() as UploadedFile & { error?: string }
+      if (!res.ok) { updateSong(idx, { uploadingAudio: false, audioError: data.error || '업로드 실패' }); return }
+      updateSong(idx, { uploadingAudio: false, audioUploaded: data })
+    } catch {
+      updateSong(idx, { uploadingAudio: false, audioError: '업로드 중 오류가 발생했습니다.' })
+    }
+  }
+
+  function addSong() {
+    setSongs(prev => [...prev, { ...EMPTY_SONG }])
   }
 
   async function handleComplete() {
     setIsCompleting(true)
-    setError(null)
     try {
-      const pid = await ensureProjectCreated()
+      const pid = await ensureProject()
       const meRes = await fetch('/api/auth/me')
       const meData = await meRes.json() as { email: string; name: string }
       const userLabel = meData.name || meData.email || 'user'
+
+      const stepFiles = [
+        ...(photoFile ? [{ step: 1, driveFileId: photoFile.driveFileId, webViewLink: photoFile.webViewLink, originalName: photoFile.originalName }] : []),
+        ...songs.flatMap((s, idx) => {
+          const stepNum = idx + 2
+          const files = []
+          if (s.lyricsUploaded) files.push({ step: stepNum, driveFileId: s.lyricsUploaded.driveFileId, webViewLink: s.lyricsUploaded.webViewLink, originalName: s.lyricsUploaded.originalName })
+          if (s.audioUploaded) files.push({ step: stepNum, driveFileId: s.audioUploaded.driveFileId, webViewLink: s.audioUploaded.webViewLink, originalName: s.audioUploaded.originalName })
+          return files
+        }),
+      ]
+
       const res = await fetch(`/api/projects/${pid}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectName: projectName || '새 프로젝트',
-          userLabel,
-          stepFiles: uploadedFiles,
-        }),
+        body: JSON.stringify({ projectName: albumTitle || '새 앨범', userLabel, stepFiles }),
       })
-      if (!res.ok) { setError('완료 처리에 실패했습니다.'); return }
+      if (!res.ok) { alert('생성에 실패했습니다.'); return }
       router.push('/board')
     } catch {
-      setError('완료 처리 중 오류가 발생했습니다.')
+      alert('생성 중 오류가 발생했습니다.')
     } finally {
       setIsCompleting(false)
+      setShowConfirmModal(false)
     }
   }
 
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setIsDragOver(false)
-    const file = e.dataTransfer.files[0]
-    if (file) handleFileUpload(file)
-  }
+  const songIdx = currentStep - 1 // 곡 단계에서 songs 배열 인덱스
 
   return (
     <div>
-      {/* 프로젝트 이름 입력 (상단) */}
-      {!projectId && currentStep === 0 && (
+      {/* 앨범 제목 */}
+      {currentStep === 0 && !projectId && (
         <div className="mb-6 bg-white rounded-lg border border-slate-200 p-5">
-          <label className="text-sm font-medium text-slate-700 block mb-2">프로젝트 이름</label>
+          <label className="text-sm font-medium text-slate-700 block mb-2">앨범 제목</label>
           <input
-            value={projectName}
-            onChange={e => setProjectName(e.target.value)}
-            placeholder="프로젝트 이름을 입력하세요"
+            value={albumTitle}
+            onChange={e => setAlbumTitle(e.target.value)}
+            placeholder="앨범 제목을 입력하세요"
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
       )}
 
       <div className="flex gap-6">
-        {/* 단계 사이드바 */}
-        <div className="w-48 shrink-0">
+        {/* 사이드바 */}
+        <div className="w-52 shrink-0">
           <div className="bg-white rounded-lg border border-slate-200 p-3 flex flex-col gap-1">
-            {STEPS.map((step, idx) => {
-              const hasFile = uploadedFiles.some(f => f.step === idx + 1)
-              const isActive = idx === currentStep
-              const isDone = idx < currentStep
+            {/* 앨범 커버 */}
+            <button
+              onClick={() => setCurrentStep(0)}
+              className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs text-left transition-colors ${
+                currentStep === 0 ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 ${
+                currentStep === 0 ? 'bg-indigo-600 text-white' : photoFile ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-500'
+              }`}>
+                {photoFile && currentStep !== 0 ? '✓' : '1'}
+              </span>
+              앨범 커버
+            </button>
+
+            {/* 곡 단계들 */}
+            {songs.map((s, idx) => {
+              const stepIdx = idx + 1
+              const isActive = currentStep === stepIdx
+              const hasSongName = s.songName.trim() !== ''
+              const hasContent = s.lyricsUploaded || s.audioUploaded
               return (
                 <button
                   key={idx}
-                  onClick={() => setCurrentStep(idx)}
+                  onClick={() => setCurrentStep(stepIdx)}
                   className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs text-left transition-colors ${
-                    isActive ? 'bg-indigo-50 text-indigo-700 font-medium' :
-                    isDone ? 'text-slate-600 hover:bg-slate-50' :
-                    'text-slate-400 hover:bg-slate-50'
+                    isActive ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-600 hover:bg-slate-50'
                   }`}
                 >
                   <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 ${
-                    isActive ? 'bg-indigo-600 text-white' :
-                    hasFile ? 'bg-green-500 text-white' :
-                    'bg-slate-200 text-slate-500'
+                    isActive ? 'bg-indigo-600 text-white' : hasContent ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-500'
                   }`}>
-                    {hasFile && !isActive ? '✓' : idx + 1}
+                    {hasContent && !isActive ? '✓' : idx + 2}
                   </span>
-                  {step.title}
+                  <span className="truncate">{hasSongName ? s.songName : `${idx + 1}번 곡`}</span>
                 </button>
               )
             })}
+
+            {/* 곡 추가 */}
+            <button
+              onClick={addSong}
+              className="flex items-center gap-2 px-3 py-2 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors mt-1"
+            >
+              <span className="w-5 h-5 rounded-full border border-dashed border-indigo-400 flex items-center justify-center text-xs shrink-0">+</span>
+              곡 추가하기
+            </button>
           </div>
         </div>
 
-        {/* 단계 콘텐츠 */}
+        {/* 콘텐츠 */}
         <div className="flex-1 bg-white rounded-lg border border-slate-200 p-6">
-          <h2 className="text-base font-semibold text-slate-900 mb-2">
-            {STEPS[currentStep].title}
-          </h2>
-          <p className="text-sm text-slate-500 mb-6">
-            {STEPS[currentStep].description}
-          </p>
+          {currentStep === 0 ? (
+            <>
+              <h2 className="text-base font-semibold text-slate-900 mb-1">앨범 커버</h2>
+              <p className="text-sm text-slate-500 mb-6">300 × 300 픽셀 정사각형 이미지를 업로드해주세요.</p>
+              <ImageUploadStep
+                uploadedFile={photoFile ?? undefined}
+                isUploading={photoUploading}
+                onFileSelect={handlePhotoUpload}
+                serverError={photoError}
+              />
+            </>
+          ) : (
+            <>
+              <h2 className="text-base font-semibold text-slate-900 mb-1">{songIdx + 1}번 곡</h2>
+              <p className="text-sm text-slate-500 mb-6">곡 이름, 가사, 곡 파일을 업로드해주세요.</p>
+              <SongStep
+                songNumber={songIdx + 1}
+                data={songs[songIdx]}
+                onSongNameChange={name => updateSong(songIdx, { songName: name })}
+                onLyricsModeChange={mode => updateSong(songIdx, { lyricsMode: mode })}
+                onLyricsTextChange={text => updateSong(songIdx, { lyricsText: text })}
+                onLyricsFileUpload={file => handleLyricsFileUpload(songIdx, file)}
+                onLyricsTextSave={() => handleLyricsTextSave(songIdx)}
+                onAudioUpload={file => handleAudioUpload(songIdx, file)}
+                isUploadingLyrics={songs[songIdx].uploadingLyrics}
+                isUploadingAudio={songs[songIdx].uploadingAudio}
+                lyricsError={songs[songIdx].lyricsError}
+                audioError={songs[songIdx].audioError}
+              />
+            </>
+          )}
 
-          {/* 파일 업로드 영역 */}
-          <div
-            onDragOver={e => { e.preventDefault(); setIsDragOver(true) }}
-            onDragLeave={() => setIsDragOver(false)}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-              isDragOver ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-            }`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }}
-            />
-            {uploadingStep === currentStep + 1 ? (
-              <p className="text-sm text-slate-500">업로드 중...</p>
-            ) : fileForCurrentStep ? (
-              <div>
-                <p className="text-sm text-green-700 font-medium">업로드 완료</p>
-                <p className="text-xs text-slate-500 mt-1">{fileForCurrentStep.originalName}</p>
-                <p className="text-xs text-slate-400 mt-2">클릭하여 파일 교체</p>
-              </div>
-            ) : (
-              <div>
-                <p className="text-sm text-slate-500">파일을 드래그하거나 클릭하여 업로드</p>
-                <p className="text-xs text-slate-400 mt-1">선택사항 — 건너뛸 수 있습니다</p>
-              </div>
-            )}
-          </div>
-
-          {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
-
-          {/* 네비게이션 버튼 */}
+          {/* 네비게이션 */}
           <div className="flex justify-between mt-8">
             <button
               onClick={() => setCurrentStep(s => Math.max(0, s - 1))}
               disabled={currentStep === 0}
-              className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-30"
+              className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-colors"
             >
               이전
             </button>
 
             {isLastStep ? (
               <button
-                onClick={handleComplete}
-                disabled={isCompleting}
-                className="rounded-md bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                onClick={() => setShowConfirmModal(true)}
+                disabled={!canComplete}
+                className="rounded-md bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                {isCompleting ? '처리 중...' : '시작하기'}
+                생성완료
               </button>
             ) : (
               <button
-                onClick={() => setCurrentStep(s => Math.min(STEPS.length - 1, s + 1))}
-                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                onClick={() => setCurrentStep(s => Math.min(totalSteps - 1, s + 1))}
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
               >
                 다음
               </button>
@@ -227,6 +330,17 @@ export default function NewProjectPage() {
           </div>
         </div>
       </div>
+
+      {showConfirmModal && (
+        <ConfirmModal
+          albumTitle={albumTitle || '새 앨범'}
+          photoUploaded={!!photoFile}
+          songs={songs}
+          onClose={() => setShowConfirmModal(false)}
+          onConfirm={handleComplete}
+          isConfirming={isCompleting}
+        />
+      )}
     </div>
   )
 }

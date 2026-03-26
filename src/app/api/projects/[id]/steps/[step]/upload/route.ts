@@ -1,8 +1,67 @@
 import { NextResponse } from "next/server";
+import sharp from "sharp";
+import Ffmpeg from "fluent-ffmpeg";
+import ffmpegPath from "ffmpeg-static";
+import { Readable, PassThrough } from "stream";
 import { requireAuth } from "@/lib/auth";
 import { getOrCreateFolder, uploadFile } from "@/lib/google-drive";
 
 export const maxDuration = 60;
+
+const STEP1_ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+];
+
+const AUDIO_FORMAT_MAP: Record<string, string> = {
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/flac": "flac",
+  "audio/x-flac": "flac",
+  "audio/aac": "aac",
+  "audio/ogg": "ogg",
+  "audio/m4a": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/mp4": "mp4",
+  "video/mp4": "mp4",
+};
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/[/\\:*?"<>|]/g, "_").trim() || "untitled";
+}
+
+async function convertToWav(buffer: Buffer, mimeType: string): Promise<Buffer> {
+  if (!ffmpegPath) throw new Error("ffmpeg를 찾을 수 없습니다.");
+  Ffmpeg.setFfmpegPath(ffmpegPath);
+
+  const inputFormat = AUDIO_FORMAT_MAP[mimeType];
+
+  return new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    const inputStream = Readable.from(buffer);
+    const outputStream = new PassThrough();
+
+    outputStream.on("data", (chunk: Buffer) => chunks.push(chunk));
+    outputStream.on("end", () => resolve(Buffer.concat(chunks)));
+    outputStream.on("error", reject);
+
+    let cmd = Ffmpeg(inputStream);
+    if (inputFormat) cmd = cmd.inputFormat(inputFormat);
+
+    cmd
+      .audioCodec("pcm_s16le")
+      .audioFrequency(44100)
+      .audioChannels(2)
+      .format("wav")
+      .on("error", (err: Error) =>
+        reject(new Error(`오디오 변환 실패: ${err.message}`))
+      )
+      .pipe(outputStream, { end: true });
+  });
+}
 
 export async function POST(
   request: Request,
@@ -13,7 +72,7 @@ export async function POST(
 
   const { id: projectId, step } = await params;
   const stepNum = parseInt(step, 10);
-  if (isNaN(stepNum) || stepNum < 1 || stepNum > 10) {
+  if (isNaN(stepNum) || stepNum < 1 || stepNum > 20) {
     return NextResponse.json(
       { error: "잘못된 단계 번호입니다." },
       { status: 400 }
@@ -22,30 +81,131 @@ export async function POST(
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
-  if (!file) {
-    return NextResponse.json({ error: "파일이 없습니다." }, { status: 400 });
-  }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
   const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID!;
-
-  // _tmp/[projectId]/ 에 임시 업로드
   const tmpFolderId = await getOrCreateFolder("_tmp", rootFolderId);
   const projectTmpFolderId = await getOrCreateFolder(projectId, tmpFolderId);
 
-  const fileName = `step${stepNum}_${file.name}`;
-  const { fileId, webViewLink } = await uploadFile(
-    buffer,
-    fileName,
-    file.type || "application/octet-stream",
-    projectTmpFolderId
-  );
+  // ── 1단계: 앨범 커버 (300x300 JPEG 변환) ──
+  if (stepNum === 1) {
+    if (!file) {
+      return NextResponse.json({ error: "파일이 없습니다." }, { status: 400 });
+    }
+    if (!STEP1_ALLOWED_TYPES.includes(file.type)) {
+      return NextResponse.json(
+        { error: "이미지 파일만 업로드 가능합니다. (JPG, PNG, WEBP, GIF)" },
+        { status: 400 }
+      );
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: "파일 크기는 10MB 이하여야 합니다." },
+        { status: 400 }
+      );
+    }
 
-  return NextResponse.json({
-    success: true,
-    driveFileId: fileId,
-    webViewLink,
-    originalName: file.name,
-    step: stepNum,
-  });
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const processed = await sharp(buffer)
+      .resize(300, 300, { fit: "cover", position: "center" })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    const { fileId, webViewLink } = await uploadFile(
+      processed,
+      "step1_photo.jpg",
+      "image/jpeg",
+      projectTmpFolderId
+    );
+
+    return NextResponse.json({
+      success: true,
+      driveFileId: fileId,
+      webViewLink,
+      originalName: file.name,
+      step: 1,
+      thumbnailBase64: `data:image/jpeg;base64,${processed.toString("base64")}`,
+    });
+  }
+
+  // ── 2단계 이상: 곡 파일 ──
+  const fileType = formData.get("fileType") as string | null; // 'lyrics' | 'audio'
+  const songName = (formData.get("songName") as string | null) || `song${stepNum - 1}`;
+  const lyricsText = formData.get("lyricsText") as string | null;
+  const songIndex = stepNum - 1; // 1-indexed song number
+  const safeName = sanitizeFilename(songName);
+
+  if (fileType === "lyrics") {
+    let lyricsBuffer: Buffer;
+    let originalName: string;
+
+    if (lyricsText !== null && lyricsText.trim() !== "") {
+      lyricsBuffer = Buffer.from(lyricsText, "utf-8");
+      originalName = `${songIndex}.${safeName}.txt`;
+    } else if (file) {
+      lyricsBuffer = Buffer.from(await file.arrayBuffer());
+      originalName = `${songIndex}.${safeName}.txt`;
+    } else {
+      return NextResponse.json(
+        { error: "가사 내용이 없습니다." },
+        { status: 400 }
+      );
+    }
+
+    const { fileId, webViewLink } = await uploadFile(
+      lyricsBuffer,
+      `${songIndex}.${safeName}.txt`,
+      "text/plain",
+      projectTmpFolderId
+    );
+
+    return NextResponse.json({
+      success: true,
+      driveFileId: fileId,
+      webViewLink,
+      originalName,
+      step: stepNum,
+    });
+  }
+
+  if (fileType === "audio") {
+    if (!file) {
+      return NextResponse.json({ error: "파일이 없습니다." }, { status: 400 });
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: "파일 크기는 100MB 이하여야 합니다." },
+        { status: 400 }
+      );
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const isWav =
+      file.type === "audio/wav" ||
+      file.type === "audio/x-wav" ||
+      file.type === "audio/wave" ||
+      file.name.toLowerCase().endsWith(".wav");
+
+    const wavBuffer = isWav ? buffer : await convertToWav(buffer, file.type);
+    const fileName = `${songIndex}.${safeName}.wav`;
+
+    const { fileId, webViewLink } = await uploadFile(
+      wavBuffer,
+      fileName,
+      "audio/wav",
+      projectTmpFolderId
+    );
+
+    return NextResponse.json({
+      success: true,
+      driveFileId: fileId,
+      webViewLink,
+      originalName: fileName,
+      step: stepNum,
+    });
+  }
+
+  return NextResponse.json(
+    { error: "fileType이 필요합니다." },
+    { status: 400 }
+  );
 }
