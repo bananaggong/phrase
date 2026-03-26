@@ -84,9 +84,8 @@ export async function createResumableUploadSession(
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
 
-  const authHeaders = await auth.getRequestHeaders(
-    "https://www.googleapis.com/upload/drive/v3/files"
-  );
+  // URL 없이 호출해야 Self-Signed JWT 모드가 아닌 일반 OAuth2 토큰 교환을 사용
+  const authHeaders = await auth.getRequestHeaders();
 
   const res = await fetch(
     "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id,webViewLink",
