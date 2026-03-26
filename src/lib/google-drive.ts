@@ -1,11 +1,15 @@
 import { google } from "googleapis";
 
+function getPrivateKey(): string {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ?? "";
+  // Vercel 환경에 따라 literal \n 또는 실제 줄바꿈 둘 다 처리
+  return raw.includes("\\n") ? raw.replace(/\\n/g, "\n") : raw;
+}
+
 function getDriveClient() {
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    },
+  const auth = new google.auth.JWT({
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: getPrivateKey(),
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
   return google.drive({ version: "v3", auth });
@@ -76,16 +80,17 @@ export async function createResumableUploadSession(
   mimeType: string,
   folderId: string
 ): Promise<string> {
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    },
+  const jwtClient = new google.auth.JWT({
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: getPrivateKey(),
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
 
-  // URL 없이 호출해야 Self-Signed JWT 모드가 아닌 일반 OAuth2 토큰 교환을 사용
-  const authHeaders = await auth.getRequestHeaders();
+  await jwtClient.authorize();
+  const token = jwtClient.credentials.access_token;
+  if (!token) throw new Error("액세스 토큰을 가져올 수 없습니다.");
+
+  const authHeaders = { Authorization: `Bearer ${token}` };
 
   const res = await fetch(
     "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id,webViewLink",

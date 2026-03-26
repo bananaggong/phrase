@@ -26,7 +26,13 @@
       "Bash(node -e \":*)",
       "Bash(pnpm approve-builds:*)",
       "Bash(pnpm install:*)",
-      "Bash(node node_modules/.pnpm/ffmpeg-static@5.3.0/node_modules/ffmpeg-static/install.js)"
+      "Bash(node node_modules/.pnpm/ffmpeg-static@5.3.0/node_modules/ffmpeg-static/install.js)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"fix: allow sharp and ffmpeg-static build scripts on Vercel:*)",
+      "Bash(git push:*)",
+      "Bash(gh run:*)",
+      "Bash(pnpm vercel:*)",
+      "Bash(grep -A2 \"^  ''''next@''''\" pnpm-lock.yaml)"
     ]
   }
 }
