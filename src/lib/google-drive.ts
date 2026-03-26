@@ -84,7 +84,8 @@ export async function createResumableUploadSession(
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
 
-  const token = await auth.getAccessToken();
+  const client = await auth.getClient();
+  const { token } = await client.getAccessToken();
 
   const res = await fetch(
     "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id,webViewLink",

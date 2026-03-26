@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import sharp from "sharp";
 import { requireAuth } from "@/lib/auth";
 import { getOrCreateFolder, uploadFile } from "@/lib/google-drive";
 
@@ -59,13 +58,9 @@ export async function POST(
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const processed = await sharp(buffer)
-      .resize(300, 300, { fit: "cover", position: "center" })
-      .jpeg({ quality: 90 })
-      .toBuffer();
 
     const { fileId, webViewLink } = await uploadFile(
-      processed,
+      buffer,
       "step1_photo.jpg",
       "image/jpeg",
       projectTmpFolderId
@@ -77,7 +72,7 @@ export async function POST(
       webViewLink,
       originalName: file.name,
       step: 1,
-      thumbnailBase64: `data:image/jpeg;base64,${processed.toString("base64")}`,
+      thumbnailBase64: `data:image/jpeg;base64,${buffer.toString("base64")}`,
     });
   }
 

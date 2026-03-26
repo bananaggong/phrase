@@ -21,7 +21,31 @@ export default function ImageUploadStep({ uploadedFile, isUploading, onFileSelec
   const displayError = localError || serverError
   const displayImage = uploadedFile?.thumbnailBase64 ?? previewUrl
 
-  function handleFile(file: File) {
+  async function resizeTo300(file: File): Promise<File> {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        URL.revokeObjectURL(url)
+        const canvas = document.createElement('canvas')
+        canvas.width = 300
+        canvas.height = 300
+        const ctx = canvas.getContext('2d')!
+        const size = Math.min(img.width, img.height)
+        const sx = (img.width - size) / 2
+        const sy = (img.height - size) / 2
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, 300, 300)
+        canvas.toBlob(blob => {
+          if (!blob) { reject(new Error('이미지 변환에 실패했습니다.')); return }
+          resolve(new File([blob], 'cover.jpg', { type: 'image/jpeg' }))
+        }, 'image/jpeg', 0.9)
+      }
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지를 읽을 수 없습니다.')) }
+      img.src = url
+    })
+  }
+
+  async function handleFile(file: File) {
     setLocalError(null)
 
     if (!ALLOWED_TYPES.includes(file.type)) {
@@ -38,7 +62,12 @@ export default function ImageUploadStep({ uploadedFile, isUploading, onFileSelec
     reader.onload = (e) => setPreviewUrl(e.target?.result as string)
     reader.readAsDataURL(file)
 
-    onFileSelect(file)
+    try {
+      const resized = await resizeTo300(file)
+      onFileSelect(resized)
+    } catch (e) {
+      setLocalError(e instanceof Error ? e.message : '이미지 처리 중 오류가 발생했습니다.')
+    }
   }
 
   function handleDrop(e: React.DragEvent) {
