@@ -30,7 +30,9 @@
     "onlyBuiltDependencies": [
       "@prisma/engines",
       "prisma",
-      "@prisma/client"
+      "@prisma/client",
+      "sharp",
+      "ffmpeg-static"
     ]
   },
   "devDependencies": {
