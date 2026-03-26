@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// Project — 사용자가 생성하는 프로젝트
+// =============================================================================
+
+model Project {
+  id                   String        @id @default(uuid()) @db.Uuid
+  userId               String        @map("user_id")       // Supabase Auth UID
+  name                 String        @db.VarChar(200)
+  description          String?       @db.Text
+  status               ProjectStatus @default(DRAFT)
+  driveUserFolderId    String?       @map("drive_user_folder_id")
+  driveProjectFolderId String?       @map("drive_project_folder_id")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  stepFiles StepFile[]
+
+  @@index([userId])
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  DRAFT  // 위자드 진행 중
+  ACTIVE // 시작하기 완료
+}
+
+// =============================================================================
+// StepFile — 위자드 각 단계에서 업로드한 파일
+// =============================================================================
+
+model StepFile {
+  id               String   @id @default(uuid()) @db.Uuid
+  projectId        String   @map("project_id") @db.Uuid
+  step             Int      // 1~10
+  originalName     String   @map("original_name") @db.VarChar(500)
+  driveFileId      String   @map("drive_file_id")
+  driveWebViewLink String?  @map("drive_web_view_link")
+  uploadedAt       DateTime @default(now()) @map("uploaded_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("step_files")
+}

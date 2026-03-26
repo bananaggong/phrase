@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm prisma:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3001\")",
+      "Bash(findstr \"LISTENING\")",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c \"taskkill /PID 14720 /F\" 2>&1)",
+      "Bash(ls node_modules/.pnpm/@prisma+client*/node_modules/@prisma/client/)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(cmd /c \"for /f \\\\\"tokens=5\\\\\" %a in \\('netstat -ano ^| findstr \\\\\":300\\\\\" ^| findstr \\\\\"LISTENING\\\\\"'\\) do taskkill /PID %a /F\" 2>&1)",
+      "Bash(cmd /c \"for /f \"\"tokens=5\"\" %a in \\(''netstat -ano ^| findstr \"\":300\"\" ^| findstr \"\"LISTENING\"\"''\\) do taskkill /PID %a /F\")",
+      "Bash(pnpm add:*)",
+      "Bash(cmd /c \"taskkill /PID 32780 /F\" 2>&1)",
+      "Bash(cmd /c \"tasklist /FI \\\\\"PID eq 32780\\\\\" /FO LIST\" 2>&1)",
+      "Bash(cmd /c \"netstat -ano | findstr \\\\\":3000\\\\\" | findstr \\\\\"LISTENING\\\\\"\" 2>&1)",
+      "Bash(cmd /c \"wmic process where processid=32780 get name,commandline 2>&1\")",
+      "Bash(cmd /c \"netstat -ano | findstr \\\\\":3000\\\\\"\" 2>&1)",
+      "Bash(cmd /c \"taskkill /IM node.exe /F\")",
+      "Bash(cmd /c \"netstat -ano | findstr \"\":3000\"\" | findstr \"\"LISTENING\"\"\")"
+    ]
+  }
+}
