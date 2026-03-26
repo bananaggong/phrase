@@ -6,9 +6,13 @@ function getPrivateKey(): string {
   return raw.includes("\\n") ? raw.replace(/\\n/g, "\n") : raw;
 }
 
+function getEmail(): string {
+  return (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? "").trim();
+}
+
 function getDriveClient() {
   const auth = new google.auth.JWT({
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    email: getEmail(),
     key: getPrivateKey(),
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
@@ -81,7 +85,7 @@ export async function createResumableUploadSession(
   folderId: string
 ): Promise<string> {
   const jwtClient = new google.auth.JWT({
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    email: getEmail(),
     key: getPrivateKey(),
     scopes: ["https://www.googleapis.com/auth/drive"],
   });

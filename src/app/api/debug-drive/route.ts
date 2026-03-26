@@ -4,7 +4,7 @@ import { google } from "googleapis";
 export const maxDuration = 30;
 
 export async function GET() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? "(없음)";
+  const email = (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? "(없음)").trim();
   const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ?? "";
   const key = rawKey.includes("\\n") ? rawKey.replace(/\\n/g, "\n") : rawKey;
 
