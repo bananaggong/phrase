@@ -3,7 +3,7 @@ import { z } from "zod";
 import { google } from "googleapis";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
-import { getOrCreateFolder } from "@/lib/google-drive";
+import { getOrCreateFolder, getRootFolderId } from "@/lib/google-drive";
 
 export const maxDuration = 60;
 
@@ -70,7 +70,7 @@ export async function POST(
   }
 
   const { projectName, userLabel, stepFiles } = parsed.data;
-  const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID!;
+  const rootFolderId = getRootFolderId();
 
   // 사용자 폴더 → 프로젝트 폴더 생성
   const userFolderId = await getOrCreateFolder(userLabel, rootFolderId);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import { getOrCreateFolder, uploadFile } from "@/lib/google-drive";
+import { getOrCreateFolder, uploadFile, getRootFolderId } from "@/lib/google-drive";
 
 export const maxDuration = 60;
 
@@ -36,7 +36,7 @@ export async function POST(
   const file = formData.get("file") as File | null;
 
   try {
-    const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID!;
+    const rootFolderId = getRootFolderId();
     const tmpFolderId = await getOrCreateFolder("_tmp", rootFolderId);
     const projectTmpFolderId = await getOrCreateFolder(projectId, tmpFolderId);
 

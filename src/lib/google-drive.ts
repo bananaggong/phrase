@@ -10,6 +10,10 @@ function getEmail(): string {
   return (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? "").trim();
 }
 
+export function getRootFolderId(): string {
+  return (process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID ?? "").trim();
+}
+
 function getDriveClient() {
   const auth = new google.auth.JWT({
     email: getEmail(),
