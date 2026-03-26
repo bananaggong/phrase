@@ -97,9 +97,9 @@ export async function POST(
         { status: 400 }
       );
     }
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > 4 * 1024 * 1024) {
       return NextResponse.json(
-        { error: "파일 크기는 10MB 이하여야 합니다." },
+        { error: "파일 크기는 4MB 이하여야 합니다." },
         { status: 400 }
       );
     }

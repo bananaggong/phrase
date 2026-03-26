@@ -33,7 +33,11 @@
       "@prisma/client",
       "sharp",
       "ffmpeg-static"
-    ]
+    ],
+    "supportedArchitectures": {
+      "os": ["win32", "linux"],
+      "cpu": ["x64"]
+    }
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

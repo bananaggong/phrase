@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
-const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_SIZE = 4 * 1024 * 1024 // 4MB (Vercel 4.5MB 한도 이하)
 
 interface Props {
   uploadedFile: { thumbnailBase64?: string; originalName: string } | undefined
@@ -29,7 +29,7 @@ export default function ImageUploadStep({ uploadedFile, isUploading, onFileSelec
       return
     }
     if (file.size > MAX_SIZE) {
-      setLocalError('파일 크기는 10MB 이하여야 합니다.')
+      setLocalError('파일 크기는 4MB 이하여야 합니다.')
       return
     }
 
@@ -120,7 +120,7 @@ export default function ImageUploadStep({ uploadedFile, isUploading, onFileSelec
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 <p className="text-sm text-slate-500 text-center">클릭하거나 드래그하여<br />이미지 업로드</p>
-                <p className="text-xs text-slate-400">JPG · PNG · WEBP · GIF · 최대 10MB</p>
+                <p className="text-xs text-slate-400">JPG · PNG · WEBP · GIF · 최대 4MB</p>
               </>
             )}
           </div>
