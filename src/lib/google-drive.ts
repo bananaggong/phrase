@@ -69,3 +69,45 @@ export async function uploadFile(
     webViewLink: res.data.webViewLink ?? "",
   };
 }
+
+// Resumable upload session URL 생성 → 클라이언트가 직접 Drive에 업로드할 수 있도록
+export async function createResumableUploadSession(
+  fileName: string,
+  mimeType: string,
+  folderId: string
+): Promise<string> {
+  const auth = new google.auth.GoogleAuth({
+    credentials: {
+      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      private_key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    },
+    scopes: ["https://www.googleapis.com/auth/drive"],
+  });
+
+  const token = await auth.getAccessToken();
+
+  const res = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id,webViewLink",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "X-Upload-Content-Type": mimeType,
+      },
+      body: JSON.stringify({
+        name: fileName,
+        parents: [folderId],
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Resumable upload session 생성 실패: ${err}`);
+  }
+
+  const uploadUrl = res.headers.get("Location");
+  if (!uploadUrl) throw new Error("Location 헤더가 없습니다.");
+  return uploadUrl;
+}

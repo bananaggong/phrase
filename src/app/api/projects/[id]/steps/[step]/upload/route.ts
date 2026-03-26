@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import Ffmpeg from "fluent-ffmpeg";
-import ffmpegPath from "ffmpeg-static";
-import { Readable, PassThrough } from "stream";
 import { requireAuth } from "@/lib/auth";
 import { getOrCreateFolder, uploadFile } from "@/lib/google-drive";
 
@@ -16,51 +13,8 @@ const STEP1_ALLOWED_TYPES = [
   "image/gif",
 ];
 
-const AUDIO_FORMAT_MAP: Record<string, string> = {
-  "audio/mpeg": "mp3",
-  "audio/mp3": "mp3",
-  "audio/flac": "flac",
-  "audio/x-flac": "flac",
-  "audio/aac": "aac",
-  "audio/ogg": "ogg",
-  "audio/m4a": "m4a",
-  "audio/x-m4a": "m4a",
-  "audio/mp4": "mp4",
-  "video/mp4": "mp4",
-};
-
 function sanitizeFilename(name: string): string {
   return name.replace(/[/\\:*?"<>|]/g, "_").trim() || "untitled";
-}
-
-async function convertToWav(buffer: Buffer, mimeType: string): Promise<Buffer> {
-  if (!ffmpegPath) throw new Error("ffmpeg를 찾을 수 없습니다.");
-  Ffmpeg.setFfmpegPath(ffmpegPath);
-
-  const inputFormat = AUDIO_FORMAT_MAP[mimeType];
-
-  return new Promise<Buffer>((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    const inputStream = Readable.from(buffer);
-    const outputStream = new PassThrough();
-
-    outputStream.on("data", (chunk: Buffer) => chunks.push(chunk));
-    outputStream.on("end", () => resolve(Buffer.concat(chunks)));
-    outputStream.on("error", reject);
-
-    let cmd = Ffmpeg(inputStream);
-    if (inputFormat) cmd = cmd.inputFormat(inputFormat);
-
-    cmd
-      .audioCodec("pcm_s16le")
-      .audioFrequency(44100)
-      .audioChannels(2)
-      .format("wav")
-      .on("error", (err: Error) =>
-        reject(new Error(`오디오 변환 실패: ${err.message}`))
-      )
-      .pipe(outputStream, { end: true });
-  });
 }
 
 export async function POST(
@@ -163,43 +117,6 @@ export async function POST(
       driveFileId: fileId,
       webViewLink,
       originalName,
-      step: stepNum,
-    });
-  }
-
-  if (fileType === "audio") {
-    if (!file) {
-      return NextResponse.json({ error: "파일이 없습니다." }, { status: 400 });
-    }
-    if (file.size > 100 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "파일 크기는 100MB 이하여야 합니다." },
-        { status: 400 }
-      );
-    }
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const isWav =
-      file.type === "audio/wav" ||
-      file.type === "audio/x-wav" ||
-      file.type === "audio/wave" ||
-      file.name.toLowerCase().endsWith(".wav");
-
-    const wavBuffer = isWav ? buffer : await convertToWav(buffer, file.type);
-    const fileName = `${songIndex}.${safeName}.wav`;
-
-    const { fileId, webViewLink } = await uploadFile(
-      wavBuffer,
-      fileName,
-      "audio/wav",
-      projectTmpFolderId
-    );
-
-    return NextResponse.json({
-      success: true,
-      driveFileId: fileId,
-      webViewLink,
-      originalName: fileName,
       step: stepNum,
     });
   }

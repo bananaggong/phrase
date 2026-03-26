@@ -51,12 +51,14 @@ export default function SongStep({
   const lyricsFileRef = useRef<HTMLInputElement>(null)
   const audioFileRef = useRef<HTMLInputElement>(null)
 
-  const MAX_AUDIO_SIZE = 100 * 1024 * 1024 // 100MB
+  const ALLOWED_AUDIO_TYPES = ['audio/wav', 'audio/x-wav', 'audio/wave']
+  const MAX_AUDIO_SIZE = 2 * 1024 * 1024 * 1024 // 2GB (Drive 직접 업로드)
 
   function handleAudioFile(file: File) {
     setClientAudioError(null)
-    if (file.size > MAX_AUDIO_SIZE) {
-      setClientAudioError('파일 크기는 100MB 이하여야 합니다.')
+    const isWav = ALLOWED_AUDIO_TYPES.includes(file.type) || file.name.toLowerCase().endsWith('.wav')
+    if (!isWav) {
+      setClientAudioError('WAV 파일만 업로드 가능합니다.')
       return
     }
     onAudioUpload(file)
@@ -189,7 +191,7 @@ export default function SongStep({
         <label className="block text-sm font-medium text-slate-700 mb-1">
           곡 파일 <span className="text-xs text-slate-400 font-normal">(선택)</span>
         </label>
-        <p className="text-xs text-slate-400 mb-2">WAV, MP3, FLAC 등 → WAV로 자동 변환 · 최대 100MB</p>
+        <p className="text-xs text-slate-400 mb-2">WAV 파일 · 용량 제한 없음</p>
         <div
           onDragOver={e => { e.preventDefault(); setAudioDragOver(true) }}
           onDragLeave={() => setAudioDragOver(false)}
@@ -207,7 +209,7 @@ export default function SongStep({
           <input
             ref={audioFileRef}
             type="file"
-            accept="audio/*,.wav,.mp3,.flac,.aac,.ogg,.m4a"
+            accept=".wav,audio/wav,audio/x-wav,audio/wave"
             className="hidden"
             onChange={e => {
               const f = e.target.files?.[0]
@@ -218,7 +220,7 @@ export default function SongStep({
           {isUploadingAudio ? (
             <div className="flex items-center justify-center gap-2">
               <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-slate-500">변환 및 업로드 중...</p>
+              <p className="text-sm text-slate-500">업로드 중...</p>
             </div>
           ) : data.audioUploaded ? (
             <div>

@@ -145,14 +145,38 @@ export default function NewProjectPage() {
     try {
       const pid = await ensureProject()
       const stepNum = idx + 2
-      const form = new FormData()
-      form.append('fileType', 'audio')
-      form.append('songName', songs[idx].songName)
-      form.append('file', file)
-      const res = await fetch(`/api/projects/${pid}/steps/${stepNum}/upload`, { method: 'POST', body: form })
-      const data = await res.json() as UploadedFile & { error?: string }
-      if (!res.ok) { updateSong(idx, { uploadingAudio: false, audioError: data.error || '업로드 실패' }); return }
-      updateSong(idx, { uploadingAudio: false, audioUploaded: data })
+
+      // 1단계: 서버에서 Google Drive Resumable Upload URL 받기
+      const urlRes = await fetch(`/api/projects/${pid}/steps/${stepNum}/upload-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ songName: songs[idx].songName }),
+      })
+      if (!urlRes.ok) {
+        const err = await urlRes.json() as { error?: string }
+        updateSong(idx, { uploadingAudio: false, audioError: err.error || '업로드 준비 실패' })
+        return
+      }
+      const { uploadUrl, fileName } = await urlRes.json() as { uploadUrl: string; fileName: string }
+
+      // 2단계: 파일을 Google Drive에 직접 업로드
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'audio/wav' },
+        body: file,
+      })
+      if (!uploadRes.ok) {
+        updateSong(idx, { uploadingAudio: false, audioError: '업로드에 실패했습니다.' })
+        return
+      }
+      const driveFile = await uploadRes.json() as { id: string; webViewLink?: string }
+      const driveFileId = driveFile.id
+      const webViewLink = driveFile.webViewLink || `https://drive.google.com/file/d/${driveFileId}/view`
+
+      updateSong(idx, {
+        uploadingAudio: false,
+        audioUploaded: { driveFileId, webViewLink, originalName: fileName },
+      })
     } catch {
       updateSong(idx, { uploadingAudio: false, audioError: '업로드 중 오류가 발생했습니다.' })
     }
