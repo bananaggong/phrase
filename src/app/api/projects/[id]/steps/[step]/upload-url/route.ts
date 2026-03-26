@@ -27,11 +27,19 @@ export async function POST(
   const songIndex = stepNum - 1;
   const fileName = `${songIndex}.${safeName}.wav`;
 
-  const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID!;
-  const tmpFolderId = await getOrCreateFolder("_tmp", rootFolderId);
-  const projectTmpFolderId = await getOrCreateFolder(projectId, tmpFolderId);
+  try {
+    const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID!;
+    const tmpFolderId = await getOrCreateFolder("_tmp", rootFolderId);
+    const projectTmpFolderId = await getOrCreateFolder(projectId, tmpFolderId);
 
-  const uploadUrl = await createResumableUploadSession(fileName, "audio/wav", projectTmpFolderId);
+    const uploadUrl = await createResumableUploadSession(fileName, "audio/wav", projectTmpFolderId);
 
-  return NextResponse.json({ uploadUrl, fileName });
+    return NextResponse.json({ uploadUrl, fileName });
+  } catch (err) {
+    console.error("[upload-url] error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "업로드 URL 생성 실패" },
+      { status: 500 }
+    );
+  }
 }

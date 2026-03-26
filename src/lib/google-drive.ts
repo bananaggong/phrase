@@ -84,15 +84,16 @@ export async function createResumableUploadSession(
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
 
-  const client = await auth.getClient();
-  const { token } = await client.getAccessToken();
+  const authHeaders = await auth.getRequestHeaders(
+    "https://www.googleapis.com/upload/drive/v3/files"
+  );
 
   const res = await fetch(
     "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id,webViewLink",
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        ...authHeaders,
         "Content-Type": "application/json",
         "X-Upload-Content-Type": mimeType,
       },
