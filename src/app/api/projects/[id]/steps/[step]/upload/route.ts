@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { getOrCreateFolder, uploadFile, getRootFolderId } from "@/lib/google-drive";
 
 export const maxDuration = 60;
@@ -22,8 +23,18 @@ export async function POST(
 ) {
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
+  const user = authResult;
 
   const { id: projectId, step } = await params;
+
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) {
+    return NextResponse.json({ error: "프로젝트를 찾을 수 없습니다." }, { status: 404 });
+  }
+  if (project.userId !== user.id) {
+    return NextResponse.json({ error: "접근 권한이 없습니다." }, { status: 403 });
+  }
+
   const stepNum = parseInt(step, 10);
   if (isNaN(stepNum) || stepNum < 1 || stepNum > 20) {
     return NextResponse.json(

@@ -70,6 +70,7 @@ export async function POST(
       const file = await drive.files.get({
         fileId: sf.driveFileId,
         fields: "parents",
+        supportsAllDrives: true,
       });
       const previousParents = (file.data.parents ?? []).join(",");
       await drive.files.update({
@@ -77,10 +78,11 @@ export async function POST(
         addParents: projectFolderId,
         removeParents: previousParents,
         fields: "id, parents",
+        supportsAllDrives: true,
       });
       savedFiles.push(sf);
-    } catch {
-      // 이동 실패 시 skip (파일이 없거나 권한 문제)
+    } catch (err) {
+      console.error("[complete] 파일 이동 실패:", sf.driveFileId, err);
     }
   }
 
@@ -111,6 +113,8 @@ export async function POST(
     const tmpFolderRes = await drive.files.list({
       q: `name='${projectId}' and trashed=false`,
       fields: "files(id)",
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true,
     });
     if (tmpFolderRes.data.files?.[0]?.id) {
       await drive.files.delete({ fileId: tmpFolderRes.data.files[0].id });
