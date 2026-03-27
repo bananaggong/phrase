@@ -70,15 +70,46 @@ export default function NewProjectPage() {
     setPhotoError(null)
     try {
       const pid = await ensureProject()
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch(`/api/projects/${pid}/steps/1/upload`, {
+
+      // 1단계: resumable upload URL 받기
+      const urlRes = await fetch(`/api/projects/${pid}/steps/1/upload-url`, {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       })
-      const data = await res.json() as UploadedFile & { error?: string }
-      if (!res.ok) { setPhotoError(data.error || '사진 업로드에 실패했습니다.'); return }
-      setPhotoFile(data)
+      if (!urlRes.ok) {
+        const err = await urlRes.json() as { error?: string }
+        setPhotoError(err.error || '업로드 준비 실패')
+        return
+      }
+      const { uploadUrl } = await urlRes.json() as { uploadUrl: string; fileName: string }
+
+      // 2단계: Drive에 직접 업로드 (CORS 에러는 무시)
+      try {
+        await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'image/jpeg' },
+          body: file,
+        })
+      } catch {
+        // CORS로 응답 못 읽지만 업로드는 완료됨
+      }
+
+      // 3단계: 서버에서 파일 확인
+      const confirmRes = await fetch(`/api/projects/${pid}/steps/1/image-confirm`, {
+        method: 'POST',
+      })
+      const confirmData = await confirmRes.json() as { driveFileId?: string; webViewLink?: string; error?: string }
+      if (!confirmRes.ok) {
+        setPhotoError(confirmData.error || '이미지 업로드 확인 실패')
+        return
+      }
+
+      setPhotoFile({
+        driveFileId: confirmData.driveFileId!,
+        webViewLink: confirmData.webViewLink || '',
+        originalName: 'step1_photo.jpg',
+      })
     } catch {
       setPhotoError('사진 업로드 중 오류가 발생했습니다.')
     } finally {

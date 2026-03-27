@@ -28,22 +28,31 @@ export async function POST(
   }
 
   const stepNum = parseInt(step, 10);
-  if (isNaN(stepNum) || stepNum < 2 || stepNum > 20) {
+  if (isNaN(stepNum) || stepNum < 1 || stepNum > 20) {
     return NextResponse.json({ error: "잘못된 단계 번호입니다." }, { status: 400 });
   }
 
-  const body = await request.json() as { songName?: string };
-  const songName = body.songName?.trim() || `song${stepNum - 1}`;
-  const safeName = sanitizeFilename(songName);
-  const songIndex = stepNum - 1;
-  const fileName = `${songIndex}.${safeName}.wav`;
+  let fileName: string;
+  let mimeType: string;
+
+  if (stepNum === 1) {
+    fileName = "step1_photo.jpg";
+    mimeType = "image/jpeg";
+  } else {
+    const body = await request.json() as { songName?: string };
+    const songName = body.songName?.trim() || `song${stepNum - 1}`;
+    const safeName = sanitizeFilename(songName);
+    const songIndex = stepNum - 1;
+    fileName = `${songIndex}.${safeName}.wav`;
+    mimeType = "audio/wav";
+  }
 
   try {
     const rootFolderId = getRootFolderId();
     const tmpFolderId = await getOrCreateFolder("_tmp", rootFolderId);
     const projectTmpFolderId = await getOrCreateFolder(projectId, tmpFolderId);
 
-    const uploadUrl = await createResumableUploadSession(fileName, "audio/wav", projectTmpFolderId);
+    const uploadUrl = await createResumableUploadSession(fileName, mimeType, projectTmpFolderId);
 
     return NextResponse.json({ uploadUrl, fileName });
   } catch (err) {

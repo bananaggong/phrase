@@ -123,6 +123,21 @@ export async function POST(
     // 삭제 실패는 무시
   }
 
-  const projectFolderLink = `https://drive.google.com/drive/folders/${projectFolderId}`;
-  return NextResponse.json({ success: true, driveProjectFolderLink: projectFolderLink });
+  // Slack 알림 (실패해도 완료 응답에 영향 없음)
+  try {
+    const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+    if (webhookUrl) {
+      await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: `새 앨범이 생성되었습니다.\n*앨범명:* ${projectName}\n*제출자:* ${userLabel}\n*파일 수:* ${savedFiles.length}개`,
+        }),
+      });
+    }
+  } catch {
+    // 알림 실패는 무시
+  }
+
+  return NextResponse.json({ success: true });
 }

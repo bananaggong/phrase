@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import DeleteProjectButton from "@/components/DeleteProjectButton";
 
 export default async function BoardPage() {
   const supabase = await createServerSupabaseClient();
@@ -49,15 +50,7 @@ export default async function BoardPage() {
                 <p className="text-xs text-slate-500 mb-3 line-clamp-2">{project.description}</p>
               )}
               <p className="text-xs text-slate-400">파일 {project.stepFiles.length}개</p>
-              {project.driveProjectFolderId && (
-                <a
-                  href={`https://drive.google.com/drive/folders/${project.driveProjectFolderId}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="mt-3 inline-block text-xs text-indigo-600 hover:text-indigo-700"
-                >
-                  Drive에서 보기 →
-                </a>
-              )}
+              <DeleteProjectButton projectId={project.id} />
             </div>
           ))}
         </div>
