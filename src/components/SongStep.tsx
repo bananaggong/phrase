@@ -13,6 +13,9 @@ export interface SongData {
   lyricsMode: 'file' | 'text'
   lyricsText: string
   lyricsUploaded: UploadedSongFile | null
+  promptMode: 'file' | 'text'
+  promptText: string
+  promptUploaded: UploadedSongFile | null
   audioUploaded: UploadedSongFile | null
 }
 
@@ -24,10 +27,16 @@ interface Props {
   onLyricsTextChange: (text: string) => void
   onLyricsFileUpload: (file: File) => void
   onLyricsTextSave: () => void
+  onPromptModeChange: (mode: 'file' | 'text') => void
+  onPromptTextChange: (text: string) => void
+  onPromptFileUpload: (file: File) => void
+  onPromptTextSave: () => void
   onAudioUpload: (file: File) => void
   isUploadingLyrics: boolean
+  isUploadingPrompt: boolean
   isUploadingAudio: boolean
   lyricsError: string | null
+  promptError: string | null
   audioError: string | null
 }
 
@@ -39,16 +48,24 @@ export default function SongStep({
   onLyricsTextChange,
   onLyricsFileUpload,
   onLyricsTextSave,
+  onPromptModeChange,
+  onPromptTextChange,
+  onPromptFileUpload,
+  onPromptTextSave,
   onAudioUpload,
   isUploadingLyrics,
+  isUploadingPrompt,
   isUploadingAudio,
   lyricsError,
+  promptError,
   audioError,
 }: Props) {
   const [lyricsDragOver, setLyricsDragOver] = useState(false)
+  const [promptDragOver, setPromptDragOver] = useState(false)
   const [audioDragOver, setAudioDragOver] = useState(false)
   const [clientAudioError, setClientAudioError] = useState<string | null>(null)
   const lyricsFileRef = useRef<HTMLInputElement>(null)
+  const promptFileRef = useRef<HTMLInputElement>(null)
   const audioFileRef = useRef<HTMLInputElement>(null)
 
   const ALLOWED_AUDIO_TYPES = ['audio/wav', 'audio/x-wav', 'audio/wave']
@@ -180,6 +197,109 @@ export default function SongStep({
                 className="ml-auto text-xs bg-slate-800 text-white px-3 py-1.5 rounded-md hover:bg-slate-700 disabled:opacity-40 transition-colors"
               >
                 {isUploadingLyrics ? '저장 중...' : '가사 저장하기'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* 프롬프트 (SUNO STYLE) */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm font-medium text-slate-700">
+            프롬프트 <span className="text-xs text-slate-400 font-normal">(SUNO STYLE · 선택)</span>
+          </label>
+          <div className="flex gap-0.5 bg-slate-100 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => onPromptModeChange('file')}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                data.promptMode === 'file'
+                  ? 'bg-white text-slate-900 shadow-sm font-medium'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              파일 업로드
+            </button>
+            <button
+              type="button"
+              onClick={() => onPromptModeChange('text')}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                data.promptMode === 'text'
+                  ? 'bg-white text-slate-900 shadow-sm font-medium'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              직접 입력
+            </button>
+          </div>
+        </div>
+
+        {data.promptMode === 'file' ? (
+          <>
+            <div
+              onDragOver={e => { e.preventDefault(); setPromptDragOver(true) }}
+              onDragLeave={() => setPromptDragOver(false)}
+              onDrop={e => {
+                e.preventDefault()
+                setPromptDragOver(false)
+                const file = e.dataTransfer.files[0]
+                if (file) onPromptFileUpload(file)
+              }}
+              onClick={() => promptFileRef.current?.click()}
+              className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-colors ${
+                promptDragOver ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <input
+                ref={promptFileRef}
+                type="file"
+                accept=".txt,text/plain"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0]
+                  if (f) onPromptFileUpload(f)
+                  e.target.value = ''
+                }}
+              />
+              {isUploadingPrompt ? (
+                <p className="text-sm text-slate-500">업로드 중...</p>
+              ) : data.promptUploaded ? (
+                <div>
+                  <p className="text-sm text-green-700 font-medium">업로드 완료</p>
+                  <p className="text-xs text-slate-500 mt-1">{data.promptUploaded.originalName}</p>
+                  <p className="text-xs text-slate-400 mt-1">클릭하여 교체</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm text-slate-500">프롬프트 파일을 드래그하거나 클릭하여 업로드</p>
+                  <p className="text-xs text-slate-400 mt-1">TXT 파일</p>
+                </div>
+              )}
+            </div>
+            {promptError && <p className="mt-1.5 text-xs text-red-600">{promptError}</p>}
+          </>
+        ) : (
+          <>
+            <textarea
+              value={data.promptText}
+              onChange={e => onPromptTextChange(e.target.value)}
+              placeholder="SUNO 스타일 프롬프트를 입력하세요..."
+              rows={4}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            />
+            <div className="flex items-center justify-between mt-2">
+              {data.promptUploaded && (
+                <p className="text-xs text-green-700">저장 완료</p>
+              )}
+              {promptError && <p className="text-xs text-red-600">{promptError}</p>}
+              <button
+                type="button"
+                onClick={onPromptTextSave}
+                disabled={!data.promptText.trim() || isUploadingPrompt}
+                className="ml-auto text-xs bg-slate-800 text-white px-3 py-1.5 rounded-md hover:bg-slate-700 disabled:opacity-40 transition-colors"
+              >
+                {isUploadingPrompt ? '저장 중...' : '프롬프트 저장하기'}
               </button>
             </div>
           </>

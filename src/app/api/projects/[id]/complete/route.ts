@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { getOrCreateFolder, getRootFolderId, getDriveClient } from "@/lib/google-drive";
+import { appendSheetRows } from "@/lib/google-sheets";
 
 export const maxDuration = 60;
 
@@ -121,6 +122,25 @@ export async function POST(
     }
   } catch {
     // 삭제 실패는 무시
+  }
+
+  // Google Sheets 기록 (곡마다 한 행)
+  const songs = [...new Set(
+    stepFiles
+      .filter(sf => sf.originalName.endsWith(".wav"))
+      .map(sf => sf.originalName.replace(/^\d+\./, "").replace(/\.wav$/, ""))
+  )];
+
+  const now = new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
+  const driveLink = `https://drive.google.com/drive/folders/${projectFolderId}`;
+
+  try {
+    await appendSheetRows(
+      [userLabel, projectName, now, "신청완료", driveLink],
+      songs.length > 0 ? songs : ["(없음)"],
+    );
+  } catch {
+    // 시트 기록 실패는 무시
   }
 
   // Slack 알림 (실패해도 완료 응답에 영향 없음)

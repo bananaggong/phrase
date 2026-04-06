@@ -15,7 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             Phrase
           </Link>
           <Link href="/board" className="text-xs text-slate-500 hover:text-slate-700 transition-colors">
-            프로젝트 목록
+            신청 현황
           </Link>
         </div>
         <form action="/api/auth/signout" method="POST">

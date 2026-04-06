@@ -50,23 +50,26 @@ export async function POST(
     const songIndex = stepNum - 1;
     const safeName = sanitizeFilename(songName);
 
-    if (fileType === "lyrics") {
-      let lyricsBuffer: Buffer;
+    if (fileType === "lyrics" || fileType === "prompt") {
+      const suffix = fileType === "prompt" ? "prompt.txt" : "txt";
+      let textBuffer: Buffer;
       let originalName: string;
 
       if (lyricsText !== null && lyricsText.trim() !== "") {
-        lyricsBuffer = Buffer.from(lyricsText, "utf-8");
-        originalName = `${songIndex}.${safeName}.txt`;
+        textBuffer = Buffer.from(lyricsText, "utf-8");
+        originalName = `${songIndex}.${safeName}.${suffix}`;
       } else if (file) {
-        lyricsBuffer = Buffer.from(await file.arrayBuffer());
-        originalName = `${songIndex}.${safeName}.txt`;
+        textBuffer = Buffer.from(await file.arrayBuffer());
+        originalName = `${songIndex}.${safeName}.${suffix}`;
       } else {
-        return NextResponse.json({ error: "가사 내용이 없습니다." }, { status: 400 });
+        const label = fileType === "prompt" ? "프롬프트" : "가사";
+        return NextResponse.json({ error: `${label} 내용이 없습니다.` }, { status: 400 });
       }
 
+      const fileName = `${songIndex}.${safeName}.${suffix}`;
       const { fileId, webViewLink } = await uploadFile(
-        lyricsBuffer,
-        `${songIndex}.${safeName}.txt`,
+        textBuffer,
+        fileName,
         "text/plain",
         projectTmpFolderId
       );

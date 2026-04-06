@@ -57,6 +57,9 @@ export default function ConfirmModal({ albumTitle, photoUploaded, songs, onClose
                       <span className={`text-xs px-1.5 py-0.5 rounded ${s.lyricsUploaded ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
                         가사
                       </span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${s.promptUploaded ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
+                        프롬프트
+                      </span>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${s.audioUploaded ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
                         곡파일
                       </span>

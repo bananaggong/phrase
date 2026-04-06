@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Phrase",
-  description: "10단계 프로젝트 생성 위자드",
+  description: "PHRASE 음원 유통 신청",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

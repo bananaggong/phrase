@@ -16,20 +16,20 @@ export default async function BoardPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-slate-900">프로젝트 보드</h1>
+        <h1 className="text-xl font-semibold text-slate-900">신청 현황</h1>
         <Link
           href="/projects/new"
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
-          새 프로젝트
+          유통 신청
         </Link>
       </div>
 
       {projects.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
-          <p className="text-sm">아직 프로젝트가 없습니다.</p>
+          <p className="text-sm">아직 신청 내역이 없습니다.</p>
           <Link href="/projects/new" className="mt-3 inline-block text-sm text-indigo-600 hover:text-indigo-700 font-medium">
-            첫 프로젝트 만들기 →
+            첫 유통 신청하기 →
           </Link>
         </div>
       ) : (
@@ -43,7 +43,7 @@ export default async function BoardPage() {
                     ? 'bg-green-50 text-green-700'
                     : 'bg-slate-100 text-slate-500'
                 }`}>
-                  {project.status === 'ACTIVE' ? '진행중' : '초안'}
+                  {project.status === 'ACTIVE' ? '신청완료' : '작성중'}
                 </span>
               </div>
               {project.description && (

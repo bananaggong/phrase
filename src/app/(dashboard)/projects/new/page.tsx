@@ -15,8 +15,10 @@ interface UploadedFile {
 
 interface SongState extends SongData {
   uploadingLyrics: boolean
+  uploadingPrompt: boolean
   uploadingAudio: boolean
   lyricsError: string | null
+  promptError: string | null
   audioError: string | null
 }
 
@@ -25,10 +27,15 @@ const EMPTY_SONG: SongState = {
   lyricsMode: 'file',
   lyricsText: '',
   lyricsUploaded: null,
+  promptMode: 'file',
+  promptText: '',
+  promptUploaded: null,
   audioUploaded: null,
   uploadingLyrics: false,
+  uploadingPrompt: false,
   uploadingAudio: false,
   lyricsError: null,
+  promptError: null,
   audioError: null,
 }
 
@@ -167,6 +174,52 @@ export default function NewProjectPage() {
     }
   }
 
+  async function handlePromptFileUpload(idx: number, file: File) {
+    if (!songs[idx].songName.trim()) {
+      updateSong(idx, { promptError: '곡 이름을 먼저 입력해주세요.' })
+      return
+    }
+    updateSong(idx, { uploadingPrompt: true, promptError: null })
+    try {
+      const pid = await ensureProject()
+      const stepNum = idx + 2
+      const form = new FormData()
+      form.append('fileType', 'prompt')
+      form.append('songName', songs[idx].songName)
+      form.append('file', file)
+      const res = await fetch(`/api/projects/${pid}/steps/${stepNum}/upload`, { method: 'POST', body: form })
+      const data = await res.json() as UploadedFile & { error?: string }
+      if (!res.ok) { updateSong(idx, { uploadingPrompt: false, promptError: data.error || '업로드 실패' }); return }
+      updateSong(idx, { uploadingPrompt: false, promptUploaded: data })
+    } catch {
+      updateSong(idx, { uploadingPrompt: false, promptError: '업로드 중 오류가 발생했습니다.' })
+    }
+  }
+
+  async function handlePromptTextSave(idx: number) {
+    const song = songs[idx]
+    if (!song.songName.trim()) {
+      updateSong(idx, { promptError: '곡 이름을 먼저 입력해주세요.' })
+      return
+    }
+    if (!song.promptText.trim()) return
+    updateSong(idx, { uploadingPrompt: true, promptError: null })
+    try {
+      const pid = await ensureProject()
+      const stepNum = idx + 2
+      const form = new FormData()
+      form.append('fileType', 'prompt')
+      form.append('songName', song.songName)
+      form.append('lyricsText', song.promptText)
+      const res = await fetch(`/api/projects/${pid}/steps/${stepNum}/upload`, { method: 'POST', body: form })
+      const data = await res.json() as UploadedFile & { error?: string }
+      if (!res.ok) { updateSong(idx, { uploadingPrompt: false, promptError: data.error || '저장 실패' }); return }
+      updateSong(idx, { uploadingPrompt: false, promptUploaded: data })
+    } catch {
+      updateSong(idx, { uploadingPrompt: false, promptError: '저장 중 오류가 발생했습니다.' })
+    }
+  }
+
   async function handleAudioUpload(idx: number, file: File) {
     if (!songs[idx].songName.trim()) {
       updateSong(idx, { audioError: '곡 이름을 먼저 입력해주세요.' })
@@ -253,6 +306,7 @@ export default function NewProjectPage() {
           const stepNum = idx + 2
           const files = []
           if (s.lyricsUploaded) files.push({ step: stepNum, driveFileId: s.lyricsUploaded.driveFileId, webViewLink: s.lyricsUploaded.webViewLink, originalName: s.lyricsUploaded.originalName })
+          if (s.promptUploaded) files.push({ step: stepNum, driveFileId: s.promptUploaded.driveFileId, webViewLink: s.promptUploaded.webViewLink, originalName: s.promptUploaded.originalName })
           if (s.audioUploaded) files.push({ step: stepNum, driveFileId: s.audioUploaded.driveFileId, webViewLink: s.audioUploaded.webViewLink, originalName: s.audioUploaded.originalName })
           return files
         }),
@@ -349,7 +403,7 @@ export default function NewProjectPage() {
           {currentStep === 0 ? (
             <>
               <h2 className="text-base font-semibold text-slate-900 mb-1">앨범 커버</h2>
-              <p className="text-sm text-slate-500 mb-6">300 × 300 픽셀 정사각형 이미지를 업로드해주세요.</p>
+              <p className="text-sm text-slate-500 mb-6">3000 × 3000 픽셀 정사각형 이미지를 업로드해주세요.</p>
               <ImageUploadStep
                 uploadedFile={photoFile ?? undefined}
                 isUploading={photoUploading}
@@ -369,10 +423,16 @@ export default function NewProjectPage() {
                 onLyricsTextChange={text => updateSong(songIdx, { lyricsText: text })}
                 onLyricsFileUpload={file => handleLyricsFileUpload(songIdx, file)}
                 onLyricsTextSave={() => handleLyricsTextSave(songIdx)}
+                onPromptModeChange={mode => updateSong(songIdx, { promptMode: mode })}
+                onPromptTextChange={text => updateSong(songIdx, { promptText: text })}
+                onPromptFileUpload={file => handlePromptFileUpload(songIdx, file)}
+                onPromptTextSave={() => handlePromptTextSave(songIdx)}
                 onAudioUpload={file => handleAudioUpload(songIdx, file)}
                 isUploadingLyrics={songs[songIdx].uploadingLyrics}
+                isUploadingPrompt={songs[songIdx].uploadingPrompt}
                 isUploadingAudio={songs[songIdx].uploadingAudio}
                 lyricsError={songs[songIdx].lyricsError}
+                promptError={songs[songIdx].promptError}
                 audioError={songs[songIdx].audioError}
               />
             </>
