@@ -32,7 +32,7 @@ export async function appendSheetRows(commonValues: string[], songs: string[]): 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
     range: "A1",
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     requestBody: { values: rows },
   });
 }

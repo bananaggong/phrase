@@ -26,6 +26,9 @@ export async function POST(
   if (project.userId !== user.id) {
     return NextResponse.json({ error: "접근 권한이 없습니다." }, { status: 403 });
   }
+  if (project.status === "ACTIVE") {
+    return NextResponse.json({ error: "이미 완료된 프로젝트입니다." }, { status: 409 });
+  }
 
   const stepNum = parseInt(step, 10);
   if (isNaN(stepNum) || stepNum < 2 || stepNum > 20) {
@@ -50,19 +53,27 @@ export async function POST(
     const songIndex = stepNum - 1;
     const safeName = sanitizeFilename(songName);
 
+    const TEXT_MAX_BYTES = 200_000 // 200KB
+
     if (fileType === "lyrics" || fileType === "prompt") {
       const suffix = fileType === "prompt" ? "prompt.txt" : "txt";
+      const label = fileType === "prompt" ? "프롬프트" : "가사";
       let textBuffer: Buffer;
       let originalName: string;
 
       if (lyricsText !== null && lyricsText.trim() !== "") {
+        if (lyricsText.length > TEXT_MAX_BYTES) {
+          return NextResponse.json({ error: `${label}가 너무 깁니다. (최대 200,000자)` }, { status: 400 });
+        }
         textBuffer = Buffer.from(lyricsText, "utf-8");
         originalName = `${songIndex}.${safeName}.${suffix}`;
       } else if (file) {
+        if (file.size > TEXT_MAX_BYTES) {
+          return NextResponse.json({ error: `${label} 파일이 너무 큽니다. (최대 200KB)` }, { status: 400 });
+        }
         textBuffer = Buffer.from(await file.arrayBuffer());
         originalName = `${songIndex}.${safeName}.${suffix}`;
       } else {
-        const label = fileType === "prompt" ? "프롬프트" : "가사";
         return NextResponse.json({ error: `${label} 내용이 없습니다.` }, { status: 400 });
       }
 

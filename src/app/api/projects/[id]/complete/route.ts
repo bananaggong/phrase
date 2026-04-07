@@ -8,8 +8,8 @@ import { appendSheetRows } from "@/lib/google-sheets";
 export const maxDuration = 60;
 
 const completeSchema = z.object({
-  projectName: z.string(),
-  userLabel: z.string(), // 사용자 이름 또는 이메일 (폴더명)
+  projectName: z.string().min(1, "앨범 제목은 필수입니다.").max(200),
+  userLabel: z.string().min(1), // 사용자 이름 또는 이메일 (폴더명)
   stepFiles: z.array(
     z.object({
       step: z.number(),
@@ -111,14 +111,15 @@ export async function POST(
 
   // _tmp/[projectId] 폴더 삭제 시도 (선택적)
   try {
+    const tmpFolderId = await getOrCreateFolder("_tmp", rootFolderId);
     const tmpFolderRes = await drive.files.list({
-      q: `name='${projectId}' and trashed=false`,
+      q: `name='${projectId}' and '${tmpFolderId}' in parents and trashed=false`,
       fields: "files(id)",
       includeItemsFromAllDrives: true,
       supportsAllDrives: true,
     });
     if (tmpFolderRes.data.files?.[0]?.id) {
-      await drive.files.delete({ fileId: tmpFolderRes.data.files[0].id });
+      await drive.files.delete({ fileId: tmpFolderRes.data.files[0].id, supportsAllDrives: true });
     }
   } catch {
     // 삭제 실패는 무시

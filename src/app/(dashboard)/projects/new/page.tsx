@@ -58,7 +58,7 @@ export default function NewProjectPage() {
 
   const totalSteps = 1 + songs.length
   const isLastStep = currentStep === totalSteps - 1
-  const canComplete = songs.every(s => s.songName.trim() !== '')
+  const canComplete = albumTitle.trim() !== '' && songs.every(s => s.songName.trim() !== '')
 
   async function ensureProject(): Promise<string> {
     if (projectId) return projectId
@@ -334,13 +334,16 @@ export default function NewProjectPage() {
       {/* 앨범 제목 */}
       {currentStep === 0 && (
         <div className="mb-6 bg-white rounded-lg border border-slate-200 p-5">
-          <label className="text-sm font-medium text-slate-700 block mb-2">앨범 제목</label>
+          <label className="text-sm font-medium text-slate-700 block mb-2">
+            앨범 제목 <span className="text-red-500">*</span>
+          </label>
           <input
             value={albumTitle}
             onChange={e => setAlbumTitle(e.target.value)}
             placeholder="앨범 제목을 입력하세요"
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
+          <p className="mt-1.5 text-xs text-slate-400">생성완료 버튼 활성화를 위해 필수 입력사항입니다.</p>
         </div>
       )}
 

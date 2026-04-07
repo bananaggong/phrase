@@ -22,6 +22,9 @@ export async function POST(
   if (project.userId !== user.id) {
     return NextResponse.json({ error: "접근 권한이 없습니다." }, { status: 403 });
   }
+  if (project.status === "ACTIVE") {
+    return NextResponse.json({ error: "이미 완료된 프로젝트입니다." }, { status: 409 });
+  }
 
   try {
     const rootFolderId = getRootFolderId();

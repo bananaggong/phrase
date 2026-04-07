@@ -23,12 +23,16 @@ export function getDriveClient() {
   return google.drive({ version: "v3", auth });
 }
 
+function escapeDriveQuery(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")
+}
+
 // 이름으로 폴더 찾기, 없으면 생성 → 폴더 ID 반환
 export async function getOrCreateFolder(name: string, parentId: string): Promise<string> {
   const drive = getDriveClient();
 
   const res = await drive.files.list({
-    q: `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    q: `name='${escapeDriveQuery(name)}' and '${escapeDriveQuery(parentId)}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: "files(id, name)",
     spaces: "drive",
     includeItemsFromAllDrives: true,
@@ -89,7 +93,7 @@ export async function findFileInFolder(
 ): Promise<{ fileId: string; webViewLink: string } | null> {
   const drive = getDriveClient();
   const res = await drive.files.list({
-    q: `name='${fileName}' and '${folderId}' in parents and trashed=false`,
+    q: `name='${escapeDriveQuery(fileName)}' and '${escapeDriveQuery(folderId)}' in parents and trashed=false`,
     fields: "files(id, webViewLink)",
     spaces: "drive",
     includeItemsFromAllDrives: true,
