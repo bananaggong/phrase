@@ -1,16 +1,39 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createBrowserSupabaseClient } from '@/lib/supabase'
 
-export default function SignupPage() {
-  const [email, setEmail] = useState('')
+export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [isReady, setIsReady] = useState(false)
+  const [hasSession, setHasSession] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function checkSession() {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (isMounted) {
+        setHasSession(Boolean(session))
+        setIsReady(true)
+      }
+    }
+
+    checkSession()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -30,54 +53,49 @@ export default function SignupPage() {
 
     try {
       const supabase = createBrowserSupabaseClient()
-      const { error: authError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/confirm` },
-      })
+      const { error: updateError } = await supabase.auth.updateUser({ password })
 
-      if (authError) {
-        setError(
-          authError.message.includes('User already registered')
-            ? '이미 가입된 이메일입니다.'
-            : '회원가입 중 오류가 발생했습니다.',
-        )
+      if (updateError) {
+        setError('비밀번호를 변경하지 못했습니다. 링크가 만료되었다면 다시 요청해 주세요.')
         return
       }
 
+      await supabase.auth.signOut()
       setIsSuccess(true)
     } catch {
-      setError('회원가입 중 오류가 발생했습니다.')
+      setError('비밀번호 변경 중 오류가 발생했습니다.')
     } finally {
       setIsLoading(false)
     }
   }
 
+  if (!isReady) {
+    return <p className="text-sm text-slate-600">비밀번호 재설정 링크를 확인하고 있습니다.</p>
+  }
+
+  if (!hasSession) {
+    return (
+      <div className="py-4 text-center">
+        <h1 className="mb-2 text-lg font-semibold text-slate-900">링크를 확인할 수 없습니다</h1>
+        <p className="text-sm leading-6 text-slate-600">
+          재설정 링크가 만료되었거나 이미 사용되었습니다. 비밀번호 찾기에서 새 링크를
+          다시 받아 주세요.
+        </p>
+        <Link
+          href="/forgot-password"
+          className="mt-5 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-700"
+        >
+          비밀번호 찾기로 이동
+        </Link>
+      </div>
+    )
+  }
+
   if (isSuccess) {
     return (
       <div className="py-4 text-center">
-        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-green-50">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-green-600"
-            aria-hidden="true"
-          >
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </div>
-        <h2 className="mb-2 text-base font-semibold text-slate-900">가입 신청 완료</h2>
-        <p className="text-sm text-slate-600">이메일 인증 후 로그인해 주세요.</p>
-        <p className="mt-1 text-xs text-slate-400">
-          받은 편지함에서 인증 메일을 확인해 주세요.
-        </p>
+        <h1 className="mb-2 text-lg font-semibold text-slate-900">비밀번호 변경 완료</h1>
+        <p className="text-sm text-slate-600">새 비밀번호로 다시 로그인해 주세요.</p>
         <Link
           href="/login"
           className="mt-5 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-700"
@@ -90,27 +108,15 @@ export default function SignupPage() {
 
   return (
     <>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">회원가입</h1>
+      <h1 className="mb-2 text-lg font-semibold text-slate-900">새 비밀번호 설정</h1>
+      <p className="mb-6 text-sm leading-6 text-slate-600">
+        앞으로 로그인할 때 사용할 새 비밀번호를 입력해 주세요.
+      </p>
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <label htmlFor="email" className="text-sm font-medium text-slate-700">
-            이메일
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@example.com"
-            autoComplete="email"
-            required
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
           <label htmlFor="password" className="text-sm font-medium text-slate-700">
-            비밀번호
+            새 비밀번호
           </label>
           <input
             id="password"
@@ -126,14 +132,14 @@ export default function SignupPage() {
 
         <div className="flex flex-col gap-1">
           <label htmlFor="password-confirm" className="text-sm font-medium text-slate-700">
-            비밀번호 확인
+            새 비밀번호 확인
           </label>
           <input
             id="password-confirm"
             type="password"
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
-            placeholder="비밀번호 재입력"
+            placeholder="새 비밀번호 재입력"
             autoComplete="new-password"
             required
             className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -151,16 +157,9 @@ export default function SignupPage() {
           disabled={isLoading}
           className="mt-1 w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
         >
-          {isLoading ? '처리 중...' : '회원가입'}
+          {isLoading ? '변경 중...' : '비밀번호 변경'}
         </button>
       </form>
-
-      <p className="mt-6 text-center text-sm text-slate-500">
-        이미 계정이 있으신가요?{' '}
-        <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-700">
-          로그인
-        </Link>
-      </p>
     </>
   )
 }
